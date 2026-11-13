@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bridge — sound & sign for deaf users</title>
+<style>
+:root{--bg:#faf7f2;--ink:#1f1b16;--mut:#7a7066;--card:#fff;--acc:#2f6f5e;--acc2:#d9822b;--line:#e8e1d6;--bad:#b3422f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,"Segoe UI",Tahoma,sans-serif}
+header{padding:28px 20px 8px;max-width:980px;margin:auto}
+h1{margin:0;font-size:28px;letter-spacing:-.02em}
+header p{margin:4px 0 0;color:var(--mut)}
+nav{max-width:980px;margin:14px auto 0;padding:0 20px;display:flex;gap:8px}
+nav button{border:1px solid var(--line);background:var(--card);padding:10px 16px;border-radius:999px;font:inherit;cursor:pointer;color:var(--mut)}
+nav button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+main{max-width:980px;margin:16px auto 60px;padding:0 20px}
+.tab{display:none}.tab.on{display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.card h2{margin:0 0 10px;font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+button.b{border:0;background:var(--acc);color:#fff;padding:10px 16px;border-radius:10px;font:inherit;cursor:pointer}
+button.b.alt{background:var(--acc2)}button.b.ghost{background:#efe9de;color:var(--ink)}
+button.b:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;min-width:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+canvas{width:100%;height:auto;background:#f3eee5;border-radius:12px;display:block}
+.cam{position:relative;transform:scaleX(-1)}
+.cam video{width:100%;border-radius:12px;display:block;background:#222}
+.cam canvas{position:absolute;inset:0;background:none}
+.count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:90px;color:#fff;text-shadow:0 2px 12px #000;transform:scaleX(-1);pointer-events:none}
+#caption{text-align:center;font-size:26px;min-height:42px;margin-top:8px}
+#heard{min-height:48px;padding:10px;background:#f6f1e8;border-radius:10px;color:var(--mut)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#efe9de;border-radius:999px;padding:4px 6px 4px 12px;margin:3px;font-size:15px}
+.chip.sug{cursor:pointer;background:#fff;border:1px dashed #cfc5b3;padding:4px 12px;color:var(--mut)}
+.chip button{border:0;background:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer}
+.mut{color:var(--mut);font-size:14px}
+.note{background:#fff6e5;border:1px solid #f0d9a8;border-radius:10px;padding:10px 12px;font-size:14px;margin:10px 0}
+#band{width:150px;height:150px;border-radius:50%;margin:10px auto;background:radial-gradient(circle,#fff 0 38%,#efe9de 39% 100%);border:6px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:44px;transition:transform .05s}
+#band.on{background:radial-gradient(circle,var(--acc2) 0 55%,#f7d9b5 56% 100%);border-color:var(--acc2);transform:scale(1.08)}
+#bandLabel{text-align:center;font-size:20px;min-height:30px}
+.meter{height:10px;background:#efe9de;border-radius:6px;overflow:hidden}.meter i{display:block;height:100%;width:0;background:var(--acc)}
+.log{max-height:200px;overflow:auto;font-size:14px}
+.log div{padding:5px 0;border-bottom:1px solid var(--line)}
+.pat{display:flex;align-items:center;gap:10px;margin:6px 0}
+.pat b{width:150px;font-weight:600}
+.pat span{display:flex;gap:3px;align-items:center}.pat i{display:block;height:12px;background:var(--acc2);border-radius:6px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+[dir=auto]{unicode-bidi:plaintext}
+</style>
+</head>
+<body>
+<header>
+  <h1>Bridge</h1>
+  <p>Hearing → Deaf: the world's sounds become vibrations, and speech becomes signs.</p>
+</header>
+<nav>
+  <button class="on" data-tab="sign">Speech → Sign</button>
+  <button data-tab="sound">Feel the Sound</button>
+</nav>
+<main>
+
+<!-- ============ SPEECH → SIGN ============ -->
+<section class="tab on" id="sign">
+  <div class="grid">
+    <div class="card">
+      <h2>Avatar</h2>
+      <canvas id="avatar" width="640" height="480"></canvas>
+      <div id="caption" dir="auto"></div>
+      <div class="row">
+        <select id="slang"><option value="ar-SA">Arabic (Saudi)</option><option value="en-US">English</option></select>
+        <button class="b" id="listen">🎙 Start listening</button>
+      </div>
+      <div id="heard" dir="auto">Speech appears here…</div>
+      <div class="row">
+        <input id="typed" placeholder="…or type a sentence to test" dir="auto" style="flex:1">
+        <button class="b ghost" id="typedGo">Sign it</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Teach it a sign</h2>
+      <div class="note">The avatar only knows signs you record, and it signs exactly like whoever recorded them. For real Saudi Sign Language, record with a signer who knows it, or follow an official dictionary.</div>
+      <div class="cam" id="camWrap" style="display:none">
+        <video id="video" playsinline muted></video><canvas id="live" width="640" height="480"></canvas>
+      </div>
+      <div id="camHolder" style="position:relative"></div>
+      <div class="row">
+        <button class="b ghost" id="camBtn">📷 Start camera</button>
+        <input id="signName" placeholder="Word or phrase, e.g. شكرا" dir="auto" style="flex:1;min-width:140px">
+      </div>
+      <div class="row">
+        <label class="mut">Length
+          <select id="dur"><option value="2">2 s</option><option value="3" selected>3 s</option><option value="4">4 s</option><option value="5">5 s</option></select>
+        </label>
+        <button class="b alt" id="rec">⏺ Record (3-2-1)</button>
+      </div>
+      <div class="mut" id="status"></div>
+      <h2 style="margin-top:16px">Quick add</h2>
+      <div id="sugs"></div>
+      <h2 style="margin-top:16px">Your signs</h2>
+      <div id="libList" class="mut">Nothing recorded yet.</div>
+      <div class="row">
+        <button class="b ghost" id="exp">Export</button>
+        <button class="b ghost" id="impBtn">Import</button>
+        <input type="file" id="imp" accept=".json" style="display:none">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEEL THE SOUND ============ -->
+<section class="tab" id="sound">
+  <div class="grid">
+    <div class="card">
+      <h2>Wristband (simulated)</h2>
+      <div id="band">〰</div>
+      <div id="bandLabel"></div>
+      <div class="meter"><i id="lvl"></i></div>
+      <div class="row" style="justify-content:center">
+        <button class="b" id="soundBtn">🎙 Start listening</button>
+      </div>
+      <p class="mut" style="text-align:center">On an Android phone in Chrome this also really vibrates. Laptops and iPhones show the pulse on screen.</p>
+    </div>
+    <div class="card">
+      <h2>Settings</h2>
+      <div class="row"><label>Name to catch&nbsp;</label>
+        <input id="myName" placeholder="Your name" dir="auto" style="flex:1">
+        <select id="nlang"><option value="ar-SA">Arabic</option><option value="en-US">English</option></select>
+      </div>
+      <div class="row"><label>Sensitivity&nbsp;</label><input type="range" id="sens" min="1" max="10" value="5"></div>
+      <h2 style="margin-top:14px">What each buzz means</h2>
+      <div id="legend"></div>
+      <h2 style="margin-top:14px">Heard</h2>
+      <div class="log" id="log"><span class="mut">Nothing yet.</span></div>
+    </div>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script type="module">
+const $=s=>document.querySelector(s);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2400)}
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+             set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.tab));
+});
+
+/* ---------- text helpers ---------- */
+const norm=s=>(s||'').toLowerCase().replace(/[ً-ْـ]/g,'').replace(/[أإآٱ]/g,'ا')
+  .replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+/* =====================================================
+   SPEECH → SIGN
+   ===================================================== */
+let lib=store.get('bridge_lib_v1',{});
+const saveLib=()=>{if(!store.set('bridge_lib_v1',lib))toast('Storage full — export your library, then delete some signs')};
+
+const HAND_CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const POSE_IDX=[0,11,12,13,14,15,16]; // nose, shoulders, elbows, wrists
+const hasHands=f=>f.hands&&f.hands.length>0;
+
+function drawFigure(ctx,f,color='#2f6f5e'){
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  ctx.clearRect(0,0,W,H);
+  if(!f)return;
+  const P=p=>[p[0]*W,p[1]*H];
+  ctx.lineCap='round';ctx.lineJoin='round';
+  if(f.body){
+    const [n,ls,rs,le,re,lw,rw]=f.body.map(P);
+    const sw=Math.hypot(ls[0]-rs[0],ls[1]-rs[1]);
+    ctx.strokeStyle=color;ctx.lineWidth=9;
+    const L=(a,b)=>{ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()};
+    L(ls,rs);L(ls,le);L(le,lw);L(rs,re);L(re,rw);
+    const mid=[(ls[0]+rs[0])/2,(ls[1]+rs[1])/2];L(mid,[mid[0],mid[1]+sw*1.3]);
+    ctx.beginPath();ctx.arc(n[0],n[1],sw*.38,0,7);ctx.stroke();
+  }
+  (f.hands||[]).forEach(h=>{
+    const pts=h.map(P);
+    ctx.strokeStyle='#d9822b';ctx.lineWidth=4;
+    HAND_CONN.forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(...pts[a]);ctx.lineTo(...pts[b]);ctx.stroke()});
+    ctx.fillStyle='#d9822b';
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(p[0],p[1],4.5,0,7);ctx.fill()});
+  });
+}
+const aCtx=$('#avatar').getContext('2d');
+const lCtx=$('#live').getContext('2d');
+
+/* ----- playback ----- */
+let playToken=0;
+function playSign(word,token){
+  return new Promise(res=>{
+    const s=lib[word];if(!s||!s.frames.length){res();return}
+    const t0=performance.now(),end=s.frames[s.frames.length-1].t;let i=0;
+    const step=()=>{
+      if(token!==playToken){res();return}
+      const el=performance.now()-t0;
+      while(i<s.frames.length-1&&s.frames[i+1].t<=el)i++;
+      drawFigure(aCtx,s.frames[i]);
+      el<end+200?requestAnimationFrame(step):res();
+    };step();
+  });
+}
+async function playQueue(words){
+  const token=++playToken;
+  for(const w of words){
+    if(token!==playToken)return;
+    $('#caption').textContent=w;
+    await playSign(w,token);
+    await sleep(150);
+  }
+  if(token===playToken){$('#caption').textContent='';}
+}
+function signText(text){
+  const t=norm(text);if(!t)return;
+  const hits=Object.keys(lib).map(k=>({k,i:t.indexOf(norm(k))})).filter(x=>x.i>=0&&norm(x.k).length>0).sort((a,b)=>a.i-b.i);
+  if(!hits.length){$('#caption').textContent='— no recorded sign for that yet —';return}
+  playQueue(hits.map(h=>h.k));
+}
+
+/* ----- speech in ----- */
+let rec1=null,listening=false;
+$('#listen').onclick=()=>{
+  if(!SR){toast('Speech recognition needs Chrome or Edge');return}
+  if(listening){listening=false;rec1&&rec1.stop();$('#listen').textContent='🎙 Start listening';return}
+  listening=true;$('#listen').textContent='⏹ Stop listening';
+  const go=()=>{
+    rec1=new SR();rec1.lang=$('#slang').value;rec1.continuous=true;rec1.interimResults=true;
+    rec1.onresult=e=>{
+      let interim='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const r=e.results[i],txt=r[0].transcript;
+        if(r.isFinal){$('#heard').textContent=txt;signText(txt)}else interim+=txt;
+      }
+      if(interim)$('#heard').textContent=interim+' …';
+    };
+    rec1.onerror=e=>{if(e.error==='not-allowed'){listening=false;$('#listen').textContent='🎙 Start listening';toast('Microphone blocked')}};
+    rec1.onend=()=>{if(listening)setTimeout(go,200)};
+    try{rec1.start()}catch(e){}
+  };go();
+};
+$('#typedGo').onclick=()=>signText($('#typed').value);
+$('#typed').onkeydown=e=>{if(e.key==='Enter')signText(e.target.value)};
+
+/* ----- camera + models ----- */
+const video=$('#video');
+let camOn=false,hand=null,pose=null,recording=false,recFrames=[],recT0=0,lastGrab=0;
+const CDN='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MODELS='https://storage.googleapis.com/mediapipe-models/';
+async function loadModels(){
+  if(hand&&pose)return;
+  $('#status').textContent='Loading hand & body models (first time only)…';
+  const m=await import(CDN+'/vision_bundle.mjs');
+  const fs=await m.FilesetResolver.forVisionTasks(CDN+'/wasm');
+  const make=async(cls,url,extra)=>{
+    for(const d of ['GPU','CPU']){
+      try{return await cls.createFromOptions(fs,{baseOptions:{modelAssetPath:url,delegate:d},runningMode:'VIDEO',...extra})}catch(e){}
+    }
+    throw new Error('model load failed');
+  };
+  hand=await make(m.HandLandmarker,MODELS+'hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',{numHands:2});
+  pose=await make(m.PoseLandmarker,MODELS+'pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',{numPoses:1});
+  $('#status').textContent='';
+}
+async function startCam(){
+  if(camOn)return;
+  try{
+    await loadModels();
+    const s=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
+    video.srcObject=s;await video.play();
+    $('#camWrap').style.display='block';camOn=true;$('#camBtn').textContent='📷 Camera on';
+    requestAnimationFrame(camLoop);
+  }catch(e){$('#status').textContent='Could not start camera/models: '+e.message+' (needs internet for the models, and camera permission)'}
+}
+function grab(){
+  const t=performance.now();
+  const h=hand.detectForVideo(video,t),p=pose.detectForVideo(video,t);
+  const r=n=>+n.toFixed(3);
+  const hands=(h.landmarks||[]).map(l=>l.map(q=>[r(q.x),r(q.y)]));
+  const lm=p.landmarks&&p.landmarks[0];
+  const body=lm?POSE_IDX.map(i=>[r(lm[i].x),r(lm[i].y)]):null;
+  return{hands,body};
+}
+function camLoop(){
+  if(!camOn)return;
+  const now=performance.now();
+  if(now-lastGrab>=50){
+    lastGrab=now;
+    try{
+      const f=grab();drawFigure(lCtx,f,'#ffffff');
+      if(recording){f.t=Math.round(now-recT0);recFrames.push(f)}
+    }catch(e){}
+  }
+  requestAnimationFrame(camLoop);
+}
+$('#camBtn').onclick=startCam;
+
+/* ----- recording ----- */
+$('#rec').onclick=async()=>{
+  const name=$('#signName').value.trim();
+  if(!name){toast('Type the word first');return}
+  if(!camOn){await startCam();if(!camOn)return}
+  $('#rec').disabled=true;
+  const cd=document.createElement('div');cd.className='count';$('#camWrap').appendChild(cd);
+  for(let c=3;c>0;c--){cd.textContent=c;await sleep(1000)}
+  cd.textContent='●';
+  recFrames=[];recT0=performance.now();recording=true;
+  await sleep(+$('#dur').value*1000);
+  recording=false;cd.remove();
+  let a=recFrames.findIndex(hasHands),b=-1;
+  for(let i=recFrames.length-1;i>=0;i--)if(hasHands(recFrames[i])){b=i;break}
+  if(a<0){toast('No hands seen — try again with your hands in view');$('#rec').disabled=false;return}
+  const frames=recFrames.slice(a,b+1),base=frames[0].t;
+  frames.forEach(f=>f.t-=base);
+  lib[name]={frames};saveLib();renderLib();
+  toast('Saved "'+name+'"');
+  $('#rec').disabled=false;
+  playQueue([name]);
+};
+
+/* ----- library UI ----- */
+const SUGS=['مرحبا','شكرا','مساعدة','ماء','نعم','لا','من فضلك','اين الحمام','انا اسف','السلام عليكم'];
+function renderLib(){
+  const box=$('#libList'),keys=Object.keys(lib);
+  box.innerHTML='';
+  if(!keys.length)box.textContent='Nothing recorded yet.';
+  keys.forEach(k=>{
+    const c=document.createElement('span');c.className='chip';
+    const t=document.createElement('span');t.dir='auto';t.textContent=k;
+    const p=document.createElement('button');p.textContent='▶';p.title='Play';p.onclick=()=>playQueue([k]);
+    const d=document.createElement('button');d.textContent='✕';d.title='Delete';d.onclick=()=>{delete lib[k];saveLib();renderLib()};
+    c.append(t,p,d);box.appendChild(c);
+  });
+  const s=$('#sugs');s.innerHTML='';
+  SUGS.filter(x=>!lib[x]).forEach(x=>{
+    const c=document.createElement('span');c.className='chip sug';c.dir='auto';c.textContent='+ '+x;
+    c.onclick=()=>{$('#signName').value=x;$('#signName').focus()};s.appendChild(c);
+  });
+}
+$('#exp').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(lib)],{type:'application/json'}));
+  a.download='bridge-signs.json';a.click();
+};
+$('#impBtn').onclick=()=>$('#imp').click();
+$('#imp').onchange=async e=>{
+  try{Object.assign(lib,JSON.parse(await e.target.files[0].text()));saveLib();renderLib();toast('Imported')}
+  catch(err){toast('Not a valid signs file')}
+};
+renderLib();
+
+/* =====================================================
+   FEEL THE SOUND
+   ===================================================== */
+const PATTERNS={
+  bang:  {label:'Loud bang / knock',  icon:'💥',pat:[500]},
+  beep:  {label:'Alarm / doorbell',   icon:'🔔',pat:[90,70,90,70,90]},
+  rumble:{label:'Low rumble / engine',icon:'🚗',pat:[300,100,300]},
+  voice: {label:'Someone is talking', icon:'🗣',pat:[40]},
+  name:  {label:'Someone said your name',icon:'👋',pat:[150,80,150,80,600]}
+};
+const COOL={bang:800,beep:1500,rumble:2000,voice:2500,name:3000};
+(function legend(){
+  const L=$('#legend');
+  Object.values(PATTERNS).forEach(p=>{
+    const r=document.createElement('div');r.className='pat';
+    const b=document.createElement('b');b.textContent=p.icon+' '+p.label;
+    const s=document.createElement('span');
+    p.pat.forEach((ms,i)=>{const e=document.createElement('i');e.style.width=Math.max(6,ms/10)+'px';if(i%2)e.style.visibility='hidden';s.appendChild(e)});
+    r.append(b,s);L.appendChild(r);
+  });
+})();
+
+const band=$('#band');
+let buzzToken=0;
+async function buzz(type){
+  const p=PATTERNS[type];
+  try{navigator.vibrate&&navigator.vibrate(p.pat)}catch(e){}
+  const tok=++buzzToken;
+  $('#bandLabel').textContent=p.icon+' '+p.label;
+  for(let i=0;i<p.pat.length;i++){
+    if(tok!==buzzToken)return;
+    band.classList.toggle('on',i%2===0);
+    await sleep(p.pat[i]);
+  }
+  band.classList.remove('on');
+  setTimeout(()=>{if(tok===buzzToken)$('#bandLabel').textContent=''},1500);
+}
+const lastFire={};
+function fire(type,detail){
+  const now=performance.now();
+  if(lastFire[type]&&now-lastFire[type]<COOL[type])return;
+  lastFire[type]=now;
+  buzz(type);
+  const log=$('#log');if(log.querySelector('.mut'))log.innerHTML='';
+  const d=document.createElement('div');
+  d.textContent=new Date().toLocaleTimeString()+'  '+PATTERNS[type].icon+' '+PATTERNS[type].label+(detail?'  — '+detail:'');
+  log.prepend(d);while(log.children.length>40)log.lastChild.remove();
+}
+
+$('#myName').value=store.get('bridge_name','');
+$('#myName').onchange=e=>store.set('bridge_name',e.target.value);
+
+let actx=null,an=null,micStream=null,tbuf,fbuf,timer=null,floor=0.01,prevRms=0,soundOn=false,rec2=null;
+$('#soundBtn').onclick=async()=>{
+  if(soundOn){stopSound();return}
+  try{
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  }catch(e){toast('Microphone blocked');return}
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  const src=actx.createMediaStreamSource(micStream);
+  an=actx.createAnalyser();an.fftSize=2048;an.smoothingTimeConstant=.2;src.connect(an);
+  tbuf=new Float32Array(an.fftSize);fbuf=new Float32Array(an.frequencyBinCount);
+  soundOn=true;$('#soundBtn').textContent='⏹ Stop listening';
+  timer=setInterval(analyse,33);
+  startNameWatch();
+};
+function stopSound(){
+  soundOn=false;clearInterval(timer);
+  micStream&&micStream.getTracks().forEach(t=>t.stop());
+  actx&&actx.close();
+  if(rec2){try{rec2.onend=null;rec2.stop()}catch(e){}}
+  $('#soundBtn').textContent='🎙 Start listening';$('#lvl').style.width='0';
+}
+function analyse(){
+  an.getFloatTimeDomainData(tbuf);an.getFloatFrequencyData(fbuf);
+  let s=0;for(let i=0;i<tbuf.length;i++)s+=tbuf[i]*tbuf[i];
+  const rms=Math.sqrt(s/tbuf.length);
+  const hz=actx.sampleRate/an.fftSize;
+  let low=0,mid=0,high=0,peak=0,peakHz=0,sum=0,n=0;
+  for(let i=Math.floor(50/hz);i<Math.min(fbuf.length,Math.floor(6000/hz));i++){
+    const f=i*hz,p=Math.pow(10,fbuf[i]/10);
+    if(f<250)low+=p;else if(f<2000)mid+=p;else high+=p;
+    if(f>=300){sum+=p;n++;if(p>peak){peak=p;peakHz=f}}
+  }
+  const total=low+mid+high+1e-12,tonality=peak/(sum/Math.max(n,1)+1e-12);
+  if(rms<floor*1.5)floor=floor*.98+rms*.02;else floor*=1.0004;
+  floor=Math.min(Math.max(floor,.002),.2);
+  const R=12-(+$('#sens').value);          // lower = more sensitive
+  const level=rms/floor,rise=rms-prevRms;prevRms=rms;
+  $('#lvl').style.width=Math.min(100,level*100/(R*3))+'%';
+  if(level>R*1.2&&rise>floor*R*.8)fire('bang');
+  else if(level>R*.6&&tonality>25&&peakHz>1500&&peakHz<5000)fire('beep',Math.round(peakHz)+' Hz');
+  else if(level>R*.8&&low/total>.6)fire('rumble');
+  else if(level>R*.5&&mid/total>.55&&tonality<25)fire('voice');
+}
+function startNameWatch(){
+  if(!SR)return;
+  const go=()=>{
+    rec2=new SR();rec2.lang=$('#nlang').value;rec2.continuous=true;rec2.interimResults=true;
+    rec2.onresult=e=>{
+      const nm=norm($('#myName').value);if(!nm)return;
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(norm(e.results[i][0].transcript).includes(nm)){fire('name');return}
+      }
+    };
+    rec2.onerror=()=>{};
+    rec2.onend=()=>{if(soundOn)setTimeout(go,200)};
+    try{rec2.start()}catch(e){}
+  };go();
+}
+</script>
+</body>
+</html>
