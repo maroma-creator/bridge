@@ -12,5 +12,6 @@ Or enable GitHub Pages (Settings → Pages → main / root) to use it from your 
 ## Notes
 The avatar only knows signs you record, and signs exactly like whoever recorded them. For real Saudi Sign Language, record with a signer who knows it.
 
-## Next
-Arduino wristband (mic + vibration motor) so the buzz happens on the wrist.
+## Wristband (ESP32)
+`wristband/wristband.ino` is the Arduino IDE sketch for a real wristband: a MAX9814 microphone and two coin vibration motors on an ESP32. Wiring and test steps are in `wristband/WIRING.md`.
+It is a prototype, not a safety device.
